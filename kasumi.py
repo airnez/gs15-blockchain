@@ -120,7 +120,6 @@ def right_shift(int, i, nb_bits=16):
     return result
 
 def left_shift(int, i, nb_bits=16):
-    #print(length, i)
 
     result = (int & (2**(nb_bits - i) - 1) ) << i  | (int >> (nb_bits - i))
     return result
@@ -195,8 +194,6 @@ def FO(x, keys_dict):
 
 def kasumi_feistel_encryption(clear_block, key, modified_key):
 
-    #x_bytes = clear_block.to_bytes(8, "little")
-
     L = clear_block[:4] # LSB
     R = clear_block[4:] # MSB
 
@@ -226,14 +223,62 @@ def kasumi_feistel_encryption(clear_block, key, modified_key):
 
     return crypted_block
 
+def kasumi_feistel_decryption(crypted_block, key, modified_key):
+
+
+        L = crypted_block[:4] # LSB
+        R = crypted_block[4:] # MSB
+
+        L = int.from_bytes(L,"little")
+        R = int.from_bytes(R,"little")
+
+        for iteration in reversed(range(0, 8)):
+
+            keys_dict = generate_sub_key(key, modified_key, iteration)
+
+            # even
+            if iteration % 2 == 0:
+                new_L = R
+                R = FO( FL(R, keys_dict), keys_dict) ^ L
+                L = new_L
+
+            #odd
+            if iteration %2 == 1:
+                new_L = R
+                R = FL( FO(R ,keys_dict) ,keys_dict) ^ L
+                L = new_L
+
+        L = L.to_bytes(4,"little")
+        R = R.to_bytes(4,"little")
+
+        clear_block = int.from_bytes(L+R, "little")
+
+        return clear_block
+
+def kasumi_demo():
+    with open("fichier_clair", "rb") as clear_file:
+        with open("fichier_chiffre", "wb") as crypted_file:
+            for clear_block in lecture_bloc(clear_file, BLOC_SIZE_BYTES):
+                crypted_block = kasumi_feistel_encryption(clear_block, key, modified_key)
+                crypted_file.write(crypted_block.to_bytes(8,"little"))
+
+    with open("fichier_chiffre", "rb") as crypted_file:
+        with open("new_clear_file", "wb") as new_file:
+            for crypted_block in lecture_bloc(crypted_file, BLOC_SIZE_BYTES):
+                clear_block = kasumi_feistel_decryption(crypted_block, key, modified_key)
+                new_file.write(clear_block.to_bytes(8,"little"))
+
+
 if __name__ == '__main__':
 
     key, modified_key = generate_keys()
 
-    with open("fichier_clair", "rb") as file:
+    with open("fichier_clair", "rb") as clear_file:
+        for clear_block in lecture_bloc(clear_file, BLOC_SIZE_BYTES):
+            crypted_block = kasumi_feistel_encryption(clear_block, key, modified_key)
+            decrypted_block = kasumi_feistel_decryption(crypted_block.to_bytes(8,"little"), key, modified_key)
 
-        for clear_block in lecture_bloc(file, BLOC_SIZE_BYTES):
+            print(f"{clear_block} => {crypted_block.to_bytes(8,'little')}"+
+                f"=> {decrypted_block.to_bytes(8,'little')}")
 
-            c = kasumi_feistel_encryption(clear_block, key, modified_key)
-            print(clear_block,"   => ", c)
             input()
