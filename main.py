@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 
+import tools
 
-print("oui")
 
 if __name__ == '__main__':
-    print("ok")
+
+    while 1:
+        a=tools.random_512_bits_integer()
+        print(a)
+        input()
