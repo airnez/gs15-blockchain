@@ -173,35 +173,28 @@ def PGCD_bezout(a,b):
     x_n = (-1)**(len(x)) * x[len(x)-2]
     y_n = (-1)**(len(y) +1) * y[len(y)-2]
 
-    print(x_n, y_n)
-
-    print(r)
-    print(q)
-    print(x)
-    print(y)
-
     return r[len(r)-2], x_n, y_n
 
 
 if __name__ == '__main__':
 
-    """
-    with open("alice_safe_512_prime_1","w") as file:
-        file.write(str(find_safe_512_bits_prime()))
-
-
-    with open("alice_safe_512_prime_2","w") as file:
-        file.write(str(find_safe_512_bits_prime()))
-
-    with open("bob_safe_512_prime_1","w") as file:
-        file.write(str(find_safe_512_bits_prime()))
-
-    with open("bob_safe_512_prime_2","w") as file:
-        file.write(str(find_safe_512_bits_prime()))
-
-    """
 
     with open("alice_safe_512_prime_1","r") as file:
         safe_prime = int(file.read())
-
         alpha = find_generator(safe_prime)
+        print(alpha)
+
+    with open("alice_safe_512_prime_2","r") as file:
+        safe_prime = int(file.read())
+        alpha = find_generator(safe_prime)
+        print(alpha)
+
+    with open("bob_safe_512_prime_1","r") as file:
+        safe_prime = int(file.read())
+        alpha = find_generator(safe_prime)
+        print(alpha)
+
+    with open("bob_safe_512_prime_2","r") as file:
+        safe_prime = int(file.read())
+        alpha = find_generator(safe_prime)
+        print(alpha)
