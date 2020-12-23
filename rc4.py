@@ -19,9 +19,9 @@ class rc4:
         self.S[self.x], self.S[self.y] = self.S[self.y], self.S[self.x]
         return self.S[(self.S[self.x] + self.S[self.y]) % 256]
 
-    # returns a generated pseudo-random bytearray of given length
+    # returns a generated pseudo-random int array of given length
     def get_bytes(self, length):
-        output = bytearray()
+        output = []
         for i in range(length):
             output.append(self.get_byte())
         return output
