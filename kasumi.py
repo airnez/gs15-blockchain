@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import random
 from rc4 import rc4
 
 BLOC_SIZE_BYTES = 8
@@ -20,34 +19,34 @@ S_BOX_2 = rc4_prng.get_bytes(256)
 """
     : encode :
         : encode les str vers bytes, avec utf8 à défaut
-
     : decode :
         decode des bytes, vers utf8 à défaut
-
-
     > plus facile de travailler avec les bits sous
     forme d'entiers que de bytes (car pas d'opérations entre bytes)
-
-
     > vaux mieux bosser en little endian
         : permet d'avoir a[0] : octet LSB
             et MSB a la fin
-
-
     > iteration ; de 0 à 7,
         donc inverse fonctions Fi, entre pair et impair
+
+    > KASUMI :
+        : cipher et decipher message font un padding pour arroundir
+            à la taille du bloc
 """
 
 
 
 """
-    à générer avec RC4, clé de 128 bits
-
+    génère clé avec RC4 ou prend une sous clé de la input_key
+    (input_key vient de diffie_hellman 512 bits)
 """
-def generate_keys():
+def generate_keys(input_key=None):
+    if input_key != None:
+        key_bin = input_key.to_bytes(64, "little")[:16]
+        key = int.from_bytes(key_bin, "little")
+
     key = int.from_bytes(bytearray(rc4_prng.get_bytes(int(KEY_BIT_SIZE/8))), 'little')
-    toXOR = int.from_bytes(bytearray(rc4_prng.get_bytes(int(KEY_BIT_SIZE/8))), 'little')
-    modified_key = key ^ toXOR
+    modified_key = key ^ NOTHING_UP_NUMBER
 
     return key, modified_key
 
@@ -62,7 +61,7 @@ def take_sub_key(key, sub_key_index):
     return key
 
 """
-    iteration : de 0 à 7
+    iteration : de 0 à 7, génère les sub keys
 """
 def generate_sub_key(key, modified_key, iteration):
 
@@ -91,6 +90,9 @@ def left_shift(int, i, nb_bits=16):
     result = (int & (2**(nb_bits - i) - 1) ) << i  | (int >> (nb_bits - i))
     return result
 
+"""
+    Générateur pour lecture d'un fichier par bloc
+"""
 def lecture_bloc(file, byte_bloc_size):
     last_iteration = False
 
@@ -159,6 +161,9 @@ def FO(x, keys_dict):
 
     return x_dash
 
+"""
+    Itération feistel chiffrement
+"""
 def kasumi_feistel_encryption(clear_block, key, modified_key):
 
     L = clear_block[:4] # LSB
@@ -190,8 +195,10 @@ def kasumi_feistel_encryption(clear_block, key, modified_key):
 
     return crypted_block
 
+"""
+    Itération feistel déchiffrement
+"""
 def kasumi_feistel_decryption(crypted_block, key, modified_key):
-
 
         L = crypted_block[:4] # LSB
         R = crypted_block[4:] # MSB
@@ -222,6 +229,52 @@ def kasumi_feistel_decryption(crypted_block, key, modified_key):
 
         return clear_block
 
+"""
+    cipher avec un message avec input key, (diffie hellman 128 permiers bits)
+"""
+def kasumi_cipher_message(message, key, modified_key):
+
+    cipher_message = b""
+    bin_message = message.encode()
+    num_blocks = len(bin_message) // 8
+
+    if num_blocks > 0 :
+        for i in range(0, num_blocks+1):
+            clear_block = bin_message[ (i)*BLOC_SIZE_BYTES : (i+1)*BLOC_SIZE_BYTES ]
+
+            crypted_block = kasumi_feistel_encryption(clear_block, key, modified_key)
+            crypted_block = crypted_block.to_bytes(8, "little")
+            cipher_message = cipher_message + crypted_block
+    else:
+
+        cipher_message = kasumi_feistel_encryption(bin_message, key, modified_key)
+        cipher_message = cipher_message.to_bytes(8, "little")
+
+    return cipher_message
+
+"""
+    decipher avec un message avec input key, (diffie hellman 128 permiers bits)
+"""
+def kasumi_decipher_message(cipher_message_bin, key, modified_key):
+
+    clear_message = b""
+    num_blocks = len(cipher_message_bin) // 8
+
+    if num_blocks > 0:
+
+        for i in range(0, num_blocks):
+            cipher_block = cipher_message_bin[ i*BLOC_SIZE_BYTES : (i+1)*BLOC_SIZE_BYTES ]
+
+            clear_block = kasumi_feistel_decryption(cipher_block, key, modified_key)
+            clear_block = clear_block.to_bytes(8, "little")
+
+            clear_message = clear_message + clear_block
+    else:
+        clear_message = kasumi_feistel_decryption(cipher_message_bin, key, modified_key)
+        clear_message = clear_message.to_bytes(8, "little")
+
+    return clear_message
+
 def kasumi_demo():
     with open("fichier_clair", "rb") as clear_file:
         with open("fichier_chiffre", "wb") as crypted_file:
@@ -238,7 +291,7 @@ def kasumi_demo():
 
 if __name__ == '__main__':
 
-    key, modified_key = generate_keys()
+    """key, modified_key = generate_keys()
 
     with open("fichier_clair", "rb") as clear_file:
         for clear_block in lecture_bloc(clear_file, BLOC_SIZE_BYTES):
@@ -248,4 +301,4 @@ if __name__ == '__main__':
             print(f"{clear_block} => {crypted_block.to_bytes(8,'little')}"+
                 f"=> {decrypted_block.to_bytes(8,'little')}")
 
-            input()
+            input()"""

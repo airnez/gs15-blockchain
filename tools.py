@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import random
+import os
 
 """
 
@@ -99,6 +100,9 @@ def fast_exponentiation(a,b,mod=1):
 
     return result
 
+"""
+    Cherche un générateur dans Zp
+"""
 def find_generator(safe_prime):
 
     q = (safe_prime-1)//2
@@ -114,35 +118,7 @@ def find_generator(safe_prime):
             continue
 
         return alpha
-
-def euclidean_division(a,b):
-    q = a//b
-    r = a%b
-    return q,r
-
-"""
-    algo euclide
-"""
-def PGCD(a,b):
-
-    if a < b:
-        a,b = b,a
-
-    r = [a,b]
-    q = []
-    i = 2
-
-    while r[len(r)-1] != 0:
-
-        q.append(r[i-2]//r[i-1])
-        r.append(r[i-2]%r[i-1])
-        i=i+1
-
-    print(r)
-    print(q)
-
-    return r[len(r)-2]
-
+        
 """
     algo euclide etendu
 """

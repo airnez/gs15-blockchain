@@ -7,9 +7,11 @@ import time
 # a retirer quand la fonction de Hash sera implémentée
 import hashlib
 
+#================ EL Gamal Signature =================
 
-
-
+"""
+    pub key : p , alpha, h
+"""
 def init_El_Gamal_Signature(p):
 
     alpha = tools.find_generator(p)
@@ -18,16 +20,14 @@ def init_El_Gamal_Signature(p):
 
     h = tools.fast_exponentiation(alpha, x, mod=p)
 
-    print(f"El gamal publc key : \n\n\t\tp:{hex(p)} \n\n\t\talpha:{hex(alpha)}, \n\n\t\th:{hex(h)})")
+    #²(f"El gamal publc key : \n\n\t\tp:{hex(p)} \n\n\t\talpha:{hex(alpha)}, \n\n\t\th:{hex(h)})")
 
-    pub_key = {"p":p, "alpha":alpha, "h":h}
+    return p, alpha, h , x
 
-    return pub_key, x
-
-def El_Gamal_Signature(pub_key, x, message=None, file_name=None):
-    p = pub_key["p"]
-    alpha = pub_key["alpha"]
-    h = pub_key["h"]
+"""
+    pub key : p , alpha, h
+"""
+def El_Gamal_Signature(p, alpha, h, x, message=None, file_name=None):
 
     if message == None and file_name == None:
         print("error : please enter a message or a filname to sign")
@@ -44,8 +44,6 @@ def El_Gamal_Signature(pub_key, x, message=None, file_name=None):
     h_M = hashlib.md5(message.encode()).digest()
     h_M = int.from_bytes(h_M, "little")
 
-    print(f"Hash :  {hex(h_M)}")
-
     _, __, y_inv = tools.PGCD_bezout(y, p-1)
 
     s_1 = tools.fast_exponentiation(alpha, y, mod=p)
@@ -53,13 +51,13 @@ def El_Gamal_Signature(pub_key, x, message=None, file_name=None):
 
     return [s_1, s_2]
 
-def check_El_Gamal_Signature(pub_key, signature, message=None, file_name=None):
+"""
+    pub key : p , alpha, h
+"""
+def check_El_Gamal_Signature(p, alpha, h, signature, message=None, file_name=None):
+
     if message == None and file_name == None:
         print("error : please enter a message or a filname to sign")
-
-    p = pub_key["p"]
-    alpha = pub_key["alpha"]
-    h = pub_key["h"]
 
     s_1 = signature[0]
     s_2 = signature[1]
@@ -75,14 +73,15 @@ def check_El_Gamal_Signature(pub_key, signature, message=None, file_name=None):
     test_2 = tools.fast_exponentiation(alpha, h_M, mod=p)
 
     if test_1 == test_2:
-        print("signature OK")
         return True
     else:
-        print("signature not OK")
         return False
 
-#======================================================================
+#=====================  RSA Signature   ==================================
 
+"""
+    pub key  : n and e
+"""
 def init_RSA_Signature(p, q):
 
     phi = (p-1)*(q-1)
@@ -103,18 +102,15 @@ def init_RSA_Signature(p, q):
 
     _, __, d = tools.PGCD_bezout(e, phi)
     if d < 0 : d = d%phi
-    print(f"d : {bin(d).count('1')}")
 
     pub_key = {"n":n, "e":e}
 
+    return n, e, d
 
-    print(f"public key :\nn : {hex(n)}\ne : {hex(e)} et {len(bin(e))}")
-
-    return pub_key, d
-
-def RSA_Signature(pub_key, d, message=None, file_name=None):
-
-    n = pub_key["n"]
+"""
+    pub key  : n and e
+"""
+def RSA_Signature(n, d, message=None, file_name=None):
 
     if message == None and file_name == None:
         print("error : please enter a message or a filname to sign")
@@ -127,15 +123,16 @@ def RSA_Signature(pub_key, d, message=None, file_name=None):
     h_M = hashlib.md5(message.encode()).digest()
     h_M = int.from_bytes(h_M, "little")
 
-    print(f"hash : {hex(h_M)}")
+    #print(f"hash : {hex(h_M)}")
 
     signature = tools.fast_exponentiation(h_M, d, mod=n)
 
-    print(f"signature : {hex(signature)}")
-
     return signature
 
-def check_RSA_signature(pub_key, signature, message=None, file_name=None):
+"""
+    pub key  : n and e
+"""
+def check_RSA_signature(e, n, signature, message=None, file_name=None):
 
     if message == None and file_name == None:
         print("error : please enter a message or a filname to check")
@@ -145,67 +142,53 @@ def check_RSA_signature(pub_key, signature, message=None, file_name=None):
         with open(file_name, "r") as file:
             message = file.read()
 
-    e = pub_key["e"]
-    n = pub_key["n"]
-
     h_M = hashlib.md5(message.encode()).digest()
     h_M = int.from_bytes(h_M, "little")
 
     test = tools.fast_exponentiation(signature, e, mod=n)
 
     if test == h_M:
-        print("signature OK")
         return True
     else:
-        print("signature not OK")
         return False
 
-# =======================================================
+# ======================  Diffie Hellman   =================================
+
 
 #Alice
+"""
+    pub_key : alpha, p, alpha**r
+"""
 def diffie_hellman_step_1(p):
 
     alpha = tools.find_generator(p)
     r = random.randint(1, p-1)
     A = tools.fast_exponentiation(alpha, r, mod=p)
 
-    data_to_send = {"p":p, "alpha":alpha, "A":A}
-
-    return data_to_send, r
+    return p, alpha, A, r
 
 #Bob
-def diffie_hellman_step_2(data_recieved):
-
-    p = data_recieved["p"]
-    alpha = data_recieved["alpha"]
-    A = data_recieved["A"]
+def diffie_hellman_step_2(p, alpha, A):
 
     s = random.randint(1, p-1)
 
     B = tools.fast_exponentiation(alpha, s, mod=p)
 
-    data_to_send = {"B":B}
-
     secret = tools.fast_exponentiation(A, s, mod=p)
-    print(f"BOB secret : {hex(secret)}")
 
-    return secret, data_to_send
+    return secret, B
 
 #Alice
-def diffie_hellman_step_3(data_recieved, r, p):
-    B = data_recieved["B"]
+def diffie_hellman_step_3(B, r, p):
 
     secret = tools.fast_exponentiation(B, r, mod=p)
-
-    print(f"Alice secret : {hex(secret)}")
-
 
     return secret
 
 
 if __name__ == '__main__':
 
-    def check_el_gamal():
+    def test_el_gamal():
         #Alice
         with open("alice_safe_512_prime_1","r") as file:
             p = int(file.read())
@@ -218,7 +201,7 @@ if __name__ == '__main__':
 
         check_El_Gamal_Signature(pub_key, signature, message="coucou c'est moi")
 
-    def check_rsa():
+    def test_rsa():
         # alice
         with open("alice_safe_512_prime_1","r") as file:
             p = int(file.read())
@@ -233,7 +216,7 @@ if __name__ == '__main__':
         #bob :
         check_RSA_signature(pub_key, signature, message="coucou c'est moi")
 
-    def check_diffie_hellamn():
+    def test_diffie_hellamn():
 
         #Alice
         with open("alice_safe_512_prime_1","r") as file:
