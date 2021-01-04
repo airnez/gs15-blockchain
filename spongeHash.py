@@ -3,9 +3,15 @@ from rc4 import rc4
 
 
 # returns a 'hash_length_bytes' long hash of given bytearray 'data'
-def sponge_hash(data: bytearray, hash_length_bytes=8, iterations=3):
-    bit_data = absorb(BitArray(bytes=data), hash_length_bytes * 8, 2 * hash_length_bytes)
-    for _ in range(iterations):
+def sponge_hash(data: bytearray, hash_length_bytes=8, absorb_iterations=1, squish_iterations=3):
+    bit_data = BitArray(bytes=data)
+
+    # absorb
+    for _ in range(absorb_iterations):
+        bit_data = absorb(bit_data, hash_length_bytes * 8, 2 * hash_length_bytes)
+
+    # squish
+    for _ in range(squish_iterations):
         bit_data = rc4_permutation(bit_data)
     return bit_data[:hash_length_bytes * 8].bytes
 
