@@ -3,8 +3,9 @@ from rc4 import rc4
 
 
 # returns a 'hash_length_bytes' long hash of given bytearray 'data'
-def sponge_hash(data: bytearray, hash_length_bytes=8, absorb_iterations=1, squish_iterations=3):
+def sponge_hash(data: bytearray, hash_length_bytes=8, absorb_iterations=1, squish_iterations=3, seed = 'Lucien&IrénéeLesBests'.encode()):
     bit_data = BitArray(bytes=data)
+    bit_data.append(seed)
 
     # absorb
     for _ in range(absorb_iterations):
