@@ -1,5 +1,9 @@
 from bitstring import BitArray
 import json
+from copy import copy
+
+from signature import init_El_Gamal_Signature, El_Gamal_Signature, init_RSA_Signature, RSA_Signature, \
+    check_El_Gamal_Signature, check_RSA_signature
 from spongeHash import sponge_hash
 
 DIFFICULTY = 8
@@ -7,27 +11,65 @@ BLOC_SIZE = 10
 
 
 class Transaction:
-    def __init__(self, debit_user_id: str, credit_user_id: str, transaction_value: float, signature: str):
-        self.debit_user_id = debit_user_id
-        self.credit_user_id = credit_user_id
+    def __init__(self, debit_user_public_key, credit_user_public_key,
+                 transaction_value: float, signature=None):
+        self.debit_user_public_key = debit_user_public_key
+        self.credit_user_public_key = credit_user_public_key
         self.transaction_value = transaction_value
         self.signature = signature
 
-    # TODO: handle transaction verification
     def verify(self):
-        return True
+        transaction_copy = copy(self)
+        transaction_copy.signature = None
+        serialized_copy = transaction_copy.serialize()
+        if self.signature is None:
+            return False
+        elif self.signature['type'] == 'El_gamal':
+            return check_El_Gamal_Signature(p=self.debit_user_public_key, signature=self.signature['signature'],
+                                            message=json.dumps(serialized_copy), alpha=self.signature['alpha'],
+                                            h=self.signature['h'])
+        elif self.signature['type'] == 'RSA':
+            return check_RSA_signature(e=self.signature['e'], n=self.signature['n'],
+                                       signature=self.signature['signature'], message=json.dumps(serialized_copy))
+        return False
+
+    # returns the signature and generates it if necessary
+    def sign(self, debit_user_private_key, signature_type='El_gamal'):
+        if self.signature is None:
+            if signature_type == 'El_gamal':
+                p, alpha, h, x = init_El_Gamal_Signature(debit_user_private_key)
+                self.signature = {'signature': El_Gamal_Signature(p=p, x=x, h=h, alpha=alpha,
+                                                                  message=json.dumps(self.serialize())),
+                                  'type': signature_type,
+                                  'alpha': alpha,
+                                  'h': h}
+
+            elif signature_type == 'RSA':
+                n, e, d = init_RSA_Signature(debit_user_private_key['p'], debit_user_private_key['q'])
+                self.signature = {'signature': RSA_Signature(n=n, d=d,
+                                                             message=json.dumps(self.serialize())),
+                                  'type': signature_type,
+                                  'e': e,
+                                  'd': d,
+                                  'n': n}
+        else:
+            print('Transaction already signed !')
+        return self.signature
 
     def serialize(self):
         return {
-            'debit_user_id': self.debit_user_id,
-            'credit_user_id': self.credit_user_id,
+            'debit_user_public_key': self.debit_user_public_key,
+            'credit_user_public_key': self.credit_user_public_key,
             'transaction_value': self.transaction_value,
-            'signature': self.signature
+            'signature': self.signature,
         }
 
     @staticmethod
     def deserialize(data):
-        return Transaction(data['debit_user_id'], data['credit_user_id'], data['transaction_value'], data['signature'])
+        return Transaction(data['debit_user_public_key'],
+                           data['credit_user_public_key'],
+                           data['transaction_value'],
+                           data['signature'])
 
 
 class Block:
@@ -69,7 +111,14 @@ class Block:
         return computed_hash[-DIFFICULTY:].bin == pattern_to_match, computed_hash
 
     # Verifies the block integrity regarding its salt and previous block hash
-    def verify(self, previous_hash):
+    def verify(self, previous_hash, signature_type):
+        transactions_verified = True
+        for transaction in self.transactions:
+            transactions_verified = transactions_verified and transaction.verify() \
+                                    and transaction.signature['type'] == signature_type
+            if not transactions_verified:
+                print('Faulty transaction in block ' + str(self.number) + ' : ' + json.dumps(transaction.serialize()))
+
         return previous_hash == self.previous_hash and self.verify_salt()[0]
 
     # Computes the salt matching the required difficulty
@@ -85,8 +134,9 @@ class Block:
 
 
 class Blockchain:
-    def __init__(self):
+    def __init__(self, signature_type='El_gamal'):
         self.chain = []
+        self.signature_type = signature_type
 
     # Mines the existing block and creates a new one
     def increment(self):
@@ -97,8 +147,14 @@ class Blockchain:
         new_block = Block(new_block_number, previous_hash)
         self.chain.append(new_block)
 
+    def init(self):
+        first_block = Block(0, 'init_block')
+        self.add_block(first_block)
+
     # Adds a transaction to the chain and increments the chain if needed
     def add_transaction(self, transaction: Transaction):
+        if len(self.chain) == 0:
+            self.init()
         if len(self.chain[-1].transactions) >= BLOC_SIZE:
             self.increment()
         block = self.chain[-1]
@@ -111,7 +167,8 @@ class Blockchain:
     # Saves the blockchain on the given file path
     def save(self, saving_file_path: str):
         with open(saving_file_path, "w") as write_file:
-            json.dump({'chain': [b.serialize() for b in self.chain]}, fp=write_file)
+            json.dump({'chain': [b.serialize() for b in self.chain],
+                       'signature_type': self.signature_type}, fp=write_file)
 
     # Returns a blockchain object from the given file path
     @staticmethod
@@ -119,7 +176,7 @@ class Blockchain:
         with open(file_path, 'r') as read_file:
             loaded_data = json.load(read_file)
             chain = loaded_data['chain']
-            blockchain = Blockchain()
+            blockchain = Blockchain(loaded_data['signature_type'])
             for b in chain:
                 blockchain.add_block(Block.deserialize(b))
         return blockchain
@@ -129,9 +186,9 @@ class Blockchain:
         verified = True
         previous_hash = self.chain[0].previous_hash
         for block in self.chain:
-            verified = verified and block.verify(previous_hash)
+            verified = verified and block.verify(previous_hash, self.signature_type)
             previous_hash = block.hash().hex
             if not verified:
-                print(block.number)
+                print('Chain rupture here: block ' + str(block.number))
                 break
         return verified
