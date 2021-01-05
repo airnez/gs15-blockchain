@@ -38,7 +38,7 @@ def El_Gamal_Signature(p, alpha, h, x, message=None, file_name=None):
         with open(file_name, "r") as file:
             message = file.read()
 
-    h_M = sponge_hash(message.encode(), hash_length_bytes=64)
+    h_M = sponge_hash(message.encode(), hash_length_bytes=32)
     h_M = int.from_bytes(h_M, "little")
 
     _, __, y_inv = tools.PGCD_bezout(y, p-1)
@@ -63,7 +63,7 @@ def check_El_Gamal_Signature(p, alpha, h, signature, message=None, file_name=Non
         with open(file_name, "r") as file:
             message = file.read()
 
-    h_M = sponge_hash(message.encode(), hash_length_bytes=64)
+    h_M = sponge_hash(message.encode(), hash_length_bytes=32)
     h_M = int.from_bytes(h_M, "little")
 
     test_1 = (tools.fast_exponentiation(h, s_1, mod=p) * tools.fast_exponentiation(s_1, s_2, mod=p) ) % p
@@ -117,7 +117,7 @@ def RSA_Signature(n, d, message=None, file_name=None):
         with open(file_name, "r") as file:
             message = file.read()
 
-    h_M = sponge_hash(message.encode(), hash_length_bytes=64)
+    h_M = sponge_hash(message.encode(), hash_length_bytes=32)
     h_M = int.from_bytes(h_M, "little")
 
     #print(f"hash : {hex(h_M)}")
@@ -139,7 +139,7 @@ def check_RSA_signature(e, n, signature, message=None, file_name=None):
         with open(file_name, "r") as file:
             message = file.read()
 
-    h_M = sponge_hash(message.encode(), hash_length_bytes=64)
+    h_M = sponge_hash(message.encode(), hash_length_bytes=32)
     h_M = int.from_bytes(h_M, "little")
 
     test = tools.fast_exponentiation(signature, e, mod=n)
