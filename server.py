@@ -39,6 +39,7 @@ class ServerThread(Thread):
         Thread.__init__(self, daemon=True)
         self.client_conection = client_conection
         self.client_name = client_name
+        self.client_conected = True
 
     """
         Every message received by the server is printed
@@ -68,7 +69,7 @@ class ServerThread(Thread):
     """
 
     def run(self):
-        while True:
+        while self.client_conected:
             # récupère la taille du message à lire
             message_length = self.client_conection.recv(4)
             if message_length != b"":
@@ -104,7 +105,8 @@ class ServerThread(Thread):
             print("\n=========================================================\n")
             print(f"\n\n\t\t *** {self.client_name} disconnected ****\n")
             del client_conections_dict[self.client_name]
-            server_socket.close()
+            self.client_conection.close()
+            self.client_conected = False
 
 
 if __name__ == '__main__':
