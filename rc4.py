@@ -33,6 +33,7 @@ class rc4:
             output.append(self.get_byte() ^ message[i])
         return output
 
+    # returns S, a pseudo random permutation order list of state_len (arg given at object instantiation)
     def get_permutation_list(self):
         return self.S
 

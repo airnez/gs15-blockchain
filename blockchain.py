@@ -2,12 +2,18 @@ from bitstring import BitArray
 import json
 from copy import copy
 
-from signature import init_El_Gamal_Signature, El_Gamal_Signature, init_RSA_Signature, RSA_Signature, \
-    check_El_Gamal_Signature, check_RSA_signature
+from signature import El_Gamal_Signature, RSA_Signature, check_El_Gamal_Signature, check_RSA_signature
 from spongeHash import sponge_hash
 
 DIFFICULTY = 8
 BLOC_SIZE = 10
+
+
+def get_user_public_key(user_public_signature):
+    if user_public_signature['signature_type'] == 'El_gamal':
+        return user_public_signature['p'] + user_public_signature['alpha'] + user_public_signature['h']
+    elif user_public_signature['signature_type'] == 'RSA':
+        return user_public_signature['n'] + user_public_signature['e']
 
 
 class Transaction:
@@ -24,33 +30,33 @@ class Transaction:
         serialized_copy = transaction_copy.serialize()
         if self.signature is None:
             return False
-        elif self.signature['type'] == 'El_gamal':
-            return check_El_Gamal_Signature(p=self.debit_user_public_key, signature=self.signature['signature'],
+        elif self.signature['signature_type'] == 'El_gamal':
+            return check_El_Gamal_Signature(p=self.signature['p'], signature=self.signature['signature'],
                                             message=json.dumps(serialized_copy), alpha=self.signature['alpha'],
                                             h=self.signature['h'])
-        elif self.signature['type'] == 'RSA':
+        elif self.signature['signature_type'] == 'RSA':
             return check_RSA_signature(e=self.signature['e'], n=self.signature['n'],
                                        signature=self.signature['signature'], message=json.dumps(serialized_copy))
         return False
 
     # returns the signature and generates it if necessary
-    def sign(self, debit_user_private_key, signature_type='El_gamal'):
+    def sign(self, debit_user_private_signature, signature_type='El_gamal'):
         if self.signature is None:
             if signature_type == 'El_gamal':
-                p, alpha, h, x = init_El_Gamal_Signature(debit_user_private_key)
+                p, alpha, h, x = debit_user_private_signature['p', 'alpha', 'h', 'x']
                 self.signature = {'signature': El_Gamal_Signature(p=p, x=x, h=h, alpha=alpha,
                                                                   message=json.dumps(self.serialize())),
-                                  'type': signature_type,
+                                  'signature_type': signature_type,
+                                  'p': p,
                                   'alpha': alpha,
                                   'h': h}
 
             elif signature_type == 'RSA':
-                n, e, d = init_RSA_Signature(debit_user_private_key['p'], debit_user_private_key['q'])
+                n, e, d = debit_user_private_signature['n, e, d']
                 self.signature = {'signature': RSA_Signature(n=n, d=d,
                                                              message=json.dumps(self.serialize())),
-                                  'type': signature_type,
+                                  'signature_type': signature_type,
                                   'e': e,
-                                  'd': d,
                                   'n': n}
         else:
             print('Transaction already signed !')

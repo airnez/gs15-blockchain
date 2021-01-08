@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import re
 import socket
 from threading import Thread
 import json
@@ -10,7 +10,7 @@ import base64
 import signature
 import kasumi
 import tools
-
+from blockchain import Transaction
 
 """
     alice/bob <-----> Server
@@ -106,11 +106,23 @@ class ClientThread(Thread):
                 with open(f"{self.client_name}_safe_512_prime_{i}", "w") as file:
                     file.write(str(p))
 
+    def load_private_key_file(self):
+        try:
+            # if there is a file load signature
+            with open(f"{self.client_name}_private_key", "r") as file:
+                self.signature_dict = json.load(file)
+                pass
+        # if not : generates the key
+        except FileNotFoundError:
+            # save it to a file
+            with open(f"{self.client_name}_private_key", "w") as file:
+                self.init_signature()
+                json.dump(self.signature_dict, file)
+
     def parse_message(self, message):
         if message["message_type"] == "diffie_hellman":
             # if step 1 is received, compute the secret and send step 2 message
             if message["diffie_hellman_step"] == 1:
-
                 self.DH_dict["p"] = message["p"]
                 self.DH_dict["A"] = message["A"]
                 self.DH_dict["alpha"] = message["alpha"]
@@ -135,7 +147,6 @@ class ClientThread(Thread):
 
             # if step 2 is received, comute the secret
             if message["diffie_hellman_step"] == 2:
-
                 self.DH_dict["secret_key"] = signature.diffie_hellman_step_3(
                     message["B"], self.DH_dict["r"], self.DH_dict["p"])
 
@@ -344,7 +355,7 @@ if __name__ == '__main__':
             client.send_json_message(json_message)
             client.client_socket.close()
             break
-        if data_input != "":
+        elif data_input != "":
             message["receiver"] = client.receiver_name
             message["data"] = data_input
             message["data_size"] = len(data_input.encode())
@@ -357,7 +368,7 @@ if __name__ == '__main__':
                     time.sleep(0.05)
 
             if client.signature_dict == {}:
-                client.init_signature()
+                client.load_private_key_file()
                 # synchronisation, waiting for receiver signature response
                 while client.receiver_signature_dict == {}:
                     time.sleep(0.05)
