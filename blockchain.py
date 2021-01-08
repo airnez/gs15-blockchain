@@ -43,7 +43,8 @@ class Transaction:
     def sign(self, debit_user_private_signature, signature_type='El_gamal'):
         if self.signature is None:
             if signature_type == 'El_gamal':
-                p, alpha, h, x = debit_user_private_signature['p', 'alpha', 'h', 'x']
+                p, alpha, h, x = debit_user_private_signature['p'], debit_user_private_signature['alpha'], \
+                                 debit_user_private_signature['h'], debit_user_private_signature['x']
                 self.signature = {'signature': El_Gamal_Signature(p=p, x=x, h=h, alpha=alpha,
                                                                   message=json.dumps(self.serialize())),
                                   'signature_type': signature_type,
@@ -52,7 +53,8 @@ class Transaction:
                                   'h': h}
 
             elif signature_type == 'RSA':
-                n, e, d = debit_user_private_signature['n, e, d']
+                n, e, d = debit_user_private_signature['n'], debit_user_private_signature['e'], \
+                          debit_user_private_signature['d']
                 self.signature = {'signature': RSA_Signature(n=n, d=d,
                                                              message=json.dumps(self.serialize())),
                                   'signature_type': signature_type,
@@ -198,3 +200,13 @@ class Blockchain:
                 print('Chain rupture here: block ' + str(block.number))
                 break
         return verified
+
+    def get_account_balance(self, public_key):
+        balance = 0
+        for block in self.chain:
+            for transaction in block.transactions:
+                if transaction.debit_user_public_key == public_key:
+                    balance -= transaction.transaction_value
+                elif transaction.credit_user_public_key == public_key:
+                    balance += transaction.transaction_value
+        return balance

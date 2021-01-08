@@ -7,6 +7,7 @@ import struct
 import time
 import base64
 
+import blockchain
 import signature
 import kasumi
 import tools
@@ -118,6 +119,26 @@ class ClientThread(Thread):
             with open(f"{self.client_name}_private_key", "w") as file:
                 self.init_signature()
                 json.dump(self.signature_dict, file)
+        finally:
+            self.send_signature_init_message()
+
+    def send_signature_init_message(self):
+        if (self.signature_type == 'RSA'):
+            message = {"sender": self.client_name,
+                       "receiver": self.receiver_name,
+                       "message_type": "signature_init",
+                       "signature_type": "RSA",
+                       "n": self.signature_dict['n'], "e": self.signature_dict['e']}
+
+        elif (self.signature_type == 'El_gamal'):
+            message = {"sender": self.client_name,
+                       "receiver": self.receiver_name,
+                       "message_type": "signature_init",
+                       "signature_type": "El_gamal",
+                       "p": self.signature_dict["p"], "alpha": self.signature_dict["alpha"],
+                       "h": self.signature_dict["h"]}
+
+        self.send_json_message(json.dumps(message))
 
     def parse_message(self, message):
         if message["message_type"] == "diffie_hellman":
@@ -164,7 +185,7 @@ class ClientThread(Thread):
                 # reçoit signature du receiver, mais générere la sienne
                 # que si on en a pas encore
                 if self.signature_dict == {}:
-                    self.init_signature()
+                    self.load_private_key_file()
 
             if message["signature_type"] == "El_gamal":
                 self.receiver_signature_dict["p"] = message["p"]
@@ -173,7 +194,7 @@ class ClientThread(Thread):
                 # reçoit signature du receiver, mais générere la sienne
                 # qui si on en a pas encore*
                 if self.signature_dict == {}:
-                    self.init_signature()
+                    self.load_private_key_file()
 
         # standad message : check signature, decipher and print the message
         if message["message_type"] == "data":
@@ -209,7 +230,7 @@ class ClientThread(Thread):
     def init_secret_key(self):
         print("*** generating secret key with diffie Hellman ***")
 
-        with open(self.client_name+"_safe_512_prime_1", "r") as file:
+        with open(self.client_name + "_safe_512_prime_1", "r") as file:
             p = int(file.read())
 
         p, alpha, A, r = signature.diffie_hellman_step_1(p)
@@ -250,14 +271,6 @@ class ClientThread(Thread):
             self.signature_dict["e"] = e
             self.signature_dict["d"] = d
 
-            message = {"sender": self.client_name,
-                       "receiver": self.receiver_name,
-                       "message_type": "signature_init",
-                       "signature_type": "RSA",
-                       "n": n, "e": e}
-
-            self.send_json_message(json.dumps(message))
-
         if self.signature_type == "El_gamal":
             print("*** Initialazing El Gamal signature ***")
 
@@ -270,14 +283,6 @@ class ClientThread(Thread):
             self.signature_dict["alpha"] = alpha
             self.signature_dict["h"] = h
             self.signature_dict["x"] = x
-
-            message = {"sender": self.client_name,
-                       "receiver": self.receiver_name,
-                       "message_type": "signature_init",
-                       "signature_type": "El_gamal",
-                       "p": p, "alpha": alpha, "h": h}
-
-            self.send_json_message(json.dumps(message))
 
     # Kasumi cipher of a whole message
     def cipher_message(self, message):
@@ -314,6 +319,16 @@ class ClientThread(Thread):
             )
         return signature_message
 
+    def generate_transaction(self, amount):
+        self.signature_dict['signature_type'] = self.signature_type
+        self.receiver_signature_dict['signature_type'] = self.signature_type
+        new_transaction = Transaction(debit_user_public_key=blockchain.get_user_public_key(self.signature_dict),
+                                      credit_user_public_key=blockchain.get_user_public_key(
+                                          self.receiver_signature_dict),
+                                      transaction_value=amount)
+        new_transaction.sign(self.signature_dict, self.signature_type)
+        return new_transaction.serialize()
+
     """
         Send a whole message as an encoded json serialized
         dictionnary.
@@ -344,8 +359,7 @@ if __name__ == '__main__':
         print(f"\t [ {client.client_name} ] >> ", end='')
         data_input = input()
 
-        message = {}
-        message["sender"] = client.client_name
+        message = {"sender": client.client_name}
 
         if data_input == "exit":
             message["message_type"] = "exit_message"
@@ -355,7 +369,40 @@ if __name__ == '__main__':
             client.send_json_message(json_message)
             client.client_socket.close()
             break
-        elif data_input != "":
+
+        if re.match("^send [0-9]+(\.[0-9]+)?$", data_input):
+            if client.signature_dict == {}:
+                print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
+                continue
+            transaction_value = float(data_input[5:])
+            message["message_type"] = "transaction_message"
+            message["receiver"] = "server"
+            message["transaction"] = client.generate_transaction(transaction_value)
+            json_message = json.dumps(message)
+            client.send_json_message(json_message)
+            continue
+
+        if data_input == "verify":
+            message["message_type"] = "verification_message"
+            message["receiver"] = "server"
+            json_message = json.dumps(message)
+            client.send_json_message(json_message)
+            continue
+
+        if data_input == "balance":
+            if client.signature_dict == {}:
+                print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
+                continue
+            client.signature_dict['signature_type'] = client.signature_type
+            client.receiver_signature_dict['signature_type'] = client.signature_type
+            message["message_type"] = "balance_message"
+            message["receiver"] = "server"
+            message["public_key_to_check"] = blockchain.get_user_public_key(client.signature_dict)
+            json_message = json.dumps(message)
+            client.send_json_message(json_message)
+            continue
+
+        if data_input != "":
             message["receiver"] = client.receiver_name
             message["data"] = data_input
             message["data_size"] = len(data_input.encode())
