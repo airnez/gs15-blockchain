@@ -223,6 +223,9 @@ class ClientThread(Thread):
                   f"\t\t\t\t\t\t\t\t(message verfied : {result})\n" +
                   f"\t [ {self.client_name} ] >> ", end='')
 
+        if message["message_type"] == "server_response":
+            print(f"\n\t\t *** server message *** {message['content']}")
+
     """
         Diffie Hellman Step 1
     """
@@ -372,9 +375,10 @@ if __name__ == '__main__':
             break
 
         # transaction command
-        if re.match("^send [0-9]+(\.[0-9]+)?$", data_input):
+        if re.match("^/send [0-9]+(\.[0-9]+)?$", data_input):
             if client.signature_dict == {}:
-                print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
+                print(
+                    "Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
                 continue
             transaction_value = float(data_input[5:])
             message["message_type"] = "transaction_message"
@@ -384,9 +388,10 @@ if __name__ == '__main__':
             client.send_json_message(json_message)
             continue
 
-        if data_input == "verify":
+        if data_input == "/verify":
             if client.signature_dict == {}:
-                print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
+                print(
+                    "Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
                 continue
             message["message_type"] = "verification_message"
             message["receiver"] = "server"
@@ -394,9 +399,10 @@ if __name__ == '__main__':
             client.send_json_message(json_message)
             continue
 
-        if data_input == "balance":
+        if data_input == "/balance":
             if client.signature_dict == {}:
-                print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
+                print(
+                    "Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
                 continue
             client.signature_dict['signature_type'] = client.signature_type
             client.receiver_signature_dict['signature_type'] = client.signature_type

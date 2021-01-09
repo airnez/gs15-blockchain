@@ -30,6 +30,16 @@ from blockchain import Transaction, Blockchain
 
    ==============================================================
 
+
+
+
+   TO DO
+
+
+     : message server -> client pour print résultat
+     X : print json serveur des transactions propre
+    : requirements.txt
+
 """
 
 
@@ -47,11 +57,12 @@ class ServerThread(Thread):
     """
 
     def print_message(self, message):
+
         print("\n=========================================================\n")
         print(f"from {message['sender']} ==>  to  ==>  {message['receiver']}\n")
 
         for key in message.keys():
-            if key in ["p", "alpha", "h", "n", "e", "A", "x", "d"]:
+            if key in ["p", "alpha", "h", "n", "e", "A", "x", "d", "public_key_to_check"]:
                 print(f"\t{key} : {hex(message[key])}\n")
                 continue
 
@@ -59,6 +70,25 @@ class ServerThread(Thread):
                 if type(message[key]) == list:
                     print(f"\tsignature\n\t\ts1 : {hex(message[key][0])}\n" +
                           f"\t\ts2 : {hex(message[key][1])}\n")
+                continue
+
+            if key == "transaction":
+                m = message["transaction"]
+                print("\ttransaction :")
+                for k in m.keys():
+
+                    if isinstance(m[k], dict):
+                        print(f"\t\t{k} :")
+                        for kk in m[k].keys():
+                            try:
+                                print(f"\t\t\t{kk} : {hex(m[k][kk])}")
+                            except:
+                                print(f"\t\t\t{kk} : {m[k][kk]}")
+                        continue
+                    try:
+                        print(f"\t\t{k} : {hex(m[k])}")
+                    except:
+                        print(f"\t\t{k} : {m[k]}")
                 continue
 
             else:
@@ -94,11 +124,25 @@ class ServerThread(Thread):
                     self.parse_message(message)
                 else:
                     # envoi du message au destinataire
-                    message_to_send = struct.pack(">L", message_length) + \
+                    self.send_json_message(message, receiver)
+                    """message_to_send = struct.pack(">L", message_length) + \
                         json.dumps(message).encode()
-                    client_conections_dict[receiver].sendall(message_to_send)
+                    client_conections_dict[receiver].sendall(message_to_send)"""
+    """
+        Send a message to the client wich this thread is connected to
+    """
 
-    # returns true if a blockchain is stored with name "gs15_blockchain" and loads it if true
+    def send_json_message(self, message, receiver):
+        json_message = json.dumps(message).encode()
+        message_length = len(json_message)
+
+        message_to_send = struct.pack(">L", message_length) + json_message
+        client_conections_dict[receiver].sendall(message_to_send)
+
+    """
+        returns true if a blockchain is stored with name "gs15_blockchain" and loads it if true
+    """
+
     def check_blockchain_stored(self):
         try:
             # if there is a file load the blockchain
@@ -128,19 +172,28 @@ class ServerThread(Thread):
 
         if message["message_type"] == "verification_message":
             self.check_blockchain_stored()
-            print("\n=========================================================\n")
+            response = {"message_type": "server_response"}
+            response["receiver"] = self.client_name
+
+            # print("\n=========================================================\n")
             if self.blockchain is not None:
-                print('Blockchain verification status :' + str(self.blockchain.verify()) + '\n')
+                response["content"] = f"Blockchain verification status: {self.blockchain.verify()}\n"
             else:
-                print('No blockchain to verify !' + '\n')
+                response["content"] = "No blockchain to verify !"
+            self.send_json_message(response, self.client_name)
+
         if message["message_type"] == "balance_message":
             self.check_blockchain_stored()
-            print("\n=========================================================\n")
+            response = {"message_type": "server_response"}
+            response["receiver"] = self.client_name
+            # print("\n=========================================================\n")
             if self.blockchain is not None:
-                print('Balance for ' + str(message["sender"]) + ' '
-                      + str(self.blockchain.get_account_balance(message['public_key_to_check'])) + '\n')
+                response["content"] = f"Balance for {message['sender']} : " +\
+                    f"{self.blockchain.get_account_balance(message['public_key_to_check'])}"
             else:
-                print('No blockchain to verify !' + '\n')
+                response["content"] = "No blockchain to verify !"
+            self.send_json_message(response, self.client_name)
+
 
 if __name__ == '__main__':
 
