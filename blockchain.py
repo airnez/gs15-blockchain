@@ -5,8 +5,8 @@ from copy import copy
 from signature import El_Gamal_Signature, RSA_Signature, check_El_Gamal_Signature, check_RSA_signature
 from spongeHash import sponge_hash
 
-DIFFICULTY = 8
-BLOC_SIZE = 10
+DIFFICULTY = 4
+BLOC_SIZE = 3
 
 
 def get_user_public_key(user_public_signature):
@@ -31,12 +31,18 @@ class Transaction:
         if self.signature is None:
             return False
         elif self.signature['signature_type'] == 'El_gamal':
-            return check_El_Gamal_Signature(p=self.signature['p'], signature=self.signature['signature'],
+            verified = check_El_Gamal_Signature(p=self.signature['p'], signature=self.signature['signature'],
                                             message=json.dumps(serialized_copy), alpha=self.signature['alpha'],
                                             h=self.signature['h'])
+            if not verified:
+                print("signature not verified")
+            return verified
         elif self.signature['signature_type'] == 'RSA':
-            return check_RSA_signature(e=self.signature['e'], n=self.signature['n'],
+            verified = check_RSA_signature(e=self.signature['e'], n=self.signature['n'],
                                        signature=self.signature['signature'], message=json.dumps(serialized_copy))
+            if not verified:
+                print("signature not verified")
+            return verified
         return False
 
     # returns the signature and generates it if necessary
@@ -116,18 +122,31 @@ class Block:
     def verify_salt(self):
         pattern_to_match = "0" * DIFFICULTY
         computed_hash = self.hash()
-        return computed_hash[-DIFFICULTY:].bin == pattern_to_match, computed_hash
+        verified = (computed_hash[-DIFFICULTY:].bin == pattern_to_match)
+        return verified, computed_hash.hex
 
     # Verifies the block integrity regarding its salt and previous block hash
-    def verify(self, previous_hash, signature_type):
+    def verify(self, previous_hash, signature_type, is_last):
         transactions_verified = True
+        previous_hash_matching = (previous_hash == self.previous_hash)
         for transaction in self.transactions:
+            corresponding_signature_type = (transaction.signature['signature_type'] == signature_type)
+            if not corresponding_signature_type:
+                print('not corresponding transaction signature type')
             transactions_verified = transactions_verified and transaction.verify() \
-                                    and transaction.signature['type'] == signature_type
+                                    and corresponding_signature_type
             if not transactions_verified:
-                print('Faulty transaction in block ' + str(self.number) + ' : ' + json.dumps(transaction.serialize()))
+                print('Faulty transaction : ' + json.dumps(transaction.serialize()))
 
-        return previous_hash == self.previous_hash and self.verify_salt()[0]
+        if not previous_hash_matching:
+            print('hashs not corresponding: ' + str(previous_hash) + ' != ' + str('self.previous_hash'))
+        if not is_last:
+            verified_salt, hash = self.verify_salt()
+            if not verified_salt:
+                print('salt verification failed')
+            return previous_hash_matching and verified_salt
+        else:
+            return previous_hash_matching
 
     # Computes the salt matching the required difficulty
     def mine(self):
@@ -135,9 +154,10 @@ class Block:
         verified, computed_hash = self.verify_salt()
         while not verified:
             self.salt = i
+            print("mining... try " + str(i))
             verified, computed_hash = self.verify_salt()
             i += 1
-        print('block ' + str(self.number) + ' mined with salt ' + str(self.salt) + ' and hash ' + computed_hash.hex)
+        print('block ' + str(self.number) + ' mined with salt ' + str(self.salt) + ' and hash ' + computed_hash)
         return computed_hash
 
 
@@ -165,8 +185,7 @@ class Blockchain:
             self.init()
         if len(self.chain[-1].transactions) >= BLOC_SIZE:
             self.increment()
-        block = self.chain[-1]
-        block.add_transaction(transaction)
+        self.chain[-1].add_transaction(transaction)
 
     # Adds a block to the chain
     def add_block(self, new_block: Block):
@@ -194,7 +213,8 @@ class Blockchain:
         verified = True
         previous_hash = self.chain[0].previous_hash
         for block in self.chain:
-            verified = verified and block.verify(previous_hash, self.signature_type)
+            is_last = (block.number == len(self.chain) - 1)
+            verified = verified and block.verify(previous_hash, self.signature_type, is_last)
             previous_hash = block.hash().hex
             if not verified:
                 print('Chain rupture here: block ' + str(block.number))
@@ -202,7 +222,7 @@ class Blockchain:
         return verified
 
     def get_account_balance(self, public_key):
-        balance = 0
+        balance = 0.0
         for block in self.chain:
             for transaction in block.transactions:
                 if transaction.debit_user_public_key == public_key:

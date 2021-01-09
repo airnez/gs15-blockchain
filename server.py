@@ -7,6 +7,7 @@ from threading import Thread
 import json
 import struct
 
+from blockchain import Transaction, Blockchain
 
 """
     Alice <------>  Server <----->  Bob
@@ -39,7 +40,8 @@ class ServerThread(Thread):
         Thread.__init__(self, daemon=True)
         self.client_conection = client_conection
         self.client_name = client_name
-        self.client_conected = True
+        self.client_connected = True
+        self.blockchain = None
 
     """
         Every message received by the server is printed
@@ -69,7 +71,8 @@ class ServerThread(Thread):
     """
 
     def run(self):
-        while self.client_conected:
+        while self.client_connected:
+            self.check_blockchain_stored()
             # récupère la taille du message à lire
             message_length = self.client_conection.recv(4)
             if message_length != b"":
@@ -96,9 +99,16 @@ class ServerThread(Thread):
                         json.dumps(message).encode()
                     client_conections_dict[receiver].sendall(message_to_send)
 
-    """
-        ton petit code ici bb
-    """
+    def check_blockchain_stored(self):
+        try:
+            # if there is a file load the blockchain
+            with open(f"gs15_blockchain", "r") as _:
+                self.blockchain = Blockchain.load("gs15_blockchain")
+                return True
+
+        # if not : wait for first transaction signature type
+        except FileNotFoundError:
+            return False
 
     def parse_message(self, message):
         if message["message_type"] == "exit_message":
@@ -106,8 +116,31 @@ class ServerThread(Thread):
             print(f"\n\n\t\t *** {self.client_name} disconnected ****\n")
             del client_conections_dict[self.client_name]
             self.client_conection.close()
-            self.client_conected = False
+            self.client_connected = False
 
+        if message["message_type"] == "transaction_message":
+            new_transaction = Transaction.deserialize(message["transaction"])
+            if self.blockchain is None:
+                if not self.check_blockchain_stored():
+                    self.blockchain = Blockchain(new_transaction.signature["signature_type"])
+            self.blockchain.add_transaction(transaction=new_transaction)
+            self.blockchain.save("gs15_blockchain")
+
+        if message["message_type"] == "verification_message":
+            self.check_blockchain_stored()
+            print("\n=========================================================\n")
+            if self.blockchain is not None:
+                print('Blockchain verification status :' + str(self.blockchain.verify()) + '\n')
+            else:
+                print('No blockchain to verify !' + '\n')
+        if message["message_type"] == "balance_message":
+            self.check_blockchain_stored()
+            print("\n=========================================================\n")
+            if self.blockchain is not None:
+                print('Balance for ' + str(message["sender"]) + ' '
+                      + str(self.blockchain.get_account_balance(message['public_key_to_check'])) + '\n')
+            else:
+                print('No blockchain to verify !' + '\n')
 
 if __name__ == '__main__':
 

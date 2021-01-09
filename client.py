@@ -383,6 +383,9 @@ if __name__ == '__main__':
             continue
 
         if data_input == "verify":
+            if client.signature_dict == {}:
+                print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")
+                continue
             message["message_type"] = "verification_message"
             message["receiver"] = "server"
             json_message = json.dumps(message)
