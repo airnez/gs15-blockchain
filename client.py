@@ -319,6 +319,7 @@ class ClientThread(Thread):
             )
         return signature_message
 
+    # generates a transaction from self to receiver with value amount
     def generate_transaction(self, amount):
         self.signature_dict['signature_type'] = self.signature_type
         self.receiver_signature_dict['signature_type'] = self.signature_type
@@ -370,6 +371,7 @@ if __name__ == '__main__':
             client.client_socket.close()
             break
 
+        # transaction command
         if re.match("^send [0-9]+(\.[0-9]+)?$", data_input):
             if client.signature_dict == {}:
                 print("Please text your interlocutor before reaching the blockchain, make sure sure he or she is connected !")

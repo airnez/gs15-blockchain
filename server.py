@@ -2,7 +2,6 @@
 
 
 import socket
-import time
 from threading import Thread
 import json
 import struct
@@ -99,6 +98,7 @@ class ServerThread(Thread):
                         json.dumps(message).encode()
                     client_conections_dict[receiver].sendall(message_to_send)
 
+    # returns true if a blockchain is stored with name "gs15_blockchain" and loads it if true
     def check_blockchain_stored(self):
         try:
             # if there is a file load the blockchain

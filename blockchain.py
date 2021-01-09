@@ -8,7 +8,7 @@ from spongeHash import sponge_hash
 DIFFICULTY = 4
 BLOC_SIZE = 3
 
-
+# returns the blockchain public key by concatenating the signature public keys
 def get_user_public_key(user_public_signature):
     if user_public_signature['signature_type'] == 'El_gamal':
         return user_public_signature['p'] + user_public_signature['alpha'] + user_public_signature['h']
@@ -221,6 +221,7 @@ class Blockchain:
                 break
         return verified
 
+    # computes the account balance for a given public key
     def get_account_balance(self, public_key):
         balance = 0.0
         for block in self.chain:
